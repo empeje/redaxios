@@ -87,7 +87,32 @@ describe('redaxios', () => {
 				expect(window.fetch).toHaveBeenCalledWith(
 					'http://foo/bar',
 					jasmine.objectContaining({
-						method: 'get',
+						method: 'GET',
+						headers: {},
+						body: undefined
+					})
+				);
+				const res = await req;
+				expect(res.status).toEqual(200);
+			} finally {
+				window.fetch = oldFetch;
+			}
+		});
+
+		it('should resolve baseURL for relative URIs', async () => {
+			const oldFetch = window.fetch;
+			try {
+				window.fetch = jasmine
+					.createSpy('fetch')
+					.and.returnValue(Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve('') }));
+				const req = axios.get('/bar', {
+					baseURL: '/foo'
+				});
+				expect(window.fetch).toHaveBeenCalledTimes(1);
+				expect(window.fetch).toHaveBeenCalledWith(
+					'/foo/bar',
+					jasmine.objectContaining({
+						method: 'GET',
 						headers: {},
 						body: undefined
 					})
@@ -178,7 +203,25 @@ describe('redaxios', () => {
 			expect(fetchMock).toHaveBeenCalledWith(
 				'/foo',
 				jasmine.objectContaining({
-					method: 'post',
+					method: 'POST',
+					headers: {
+						'content-type': 'application/json'
+					},
+					body: '{"hello":"world"}'
+				})
+			);
+			expect(res.status).toEqual(200);
+			expect(res.data).toEqual('yep');
+		});
+
+		it('should issue PATCH requests (with JSON body)', async () => {
+			const res = await axios.patch('/foo', {
+				hello: 'world'
+			});
+			expect(fetchMock).toHaveBeenCalledWith(
+				'/foo',
+				jasmine.objectContaining({
+					method: 'PATCH',
 					headers: {
 						'content-type': 'application/json'
 					},
@@ -210,7 +253,7 @@ describe('redaxios', () => {
 				expect(fetchMock).toHaveBeenCalledWith(
 					'/foo',
 					jasmine.objectContaining({
-						method: 'post',
+						method: 'POST',
 						headers: {
 							'content-type': 'multipart/form-data'
 						},
@@ -223,13 +266,15 @@ describe('redaxios', () => {
 		});
 	});
 
-	it('should accept a custom fetch implementation', async () => {
-		const req = axios.get(jsonExample, { fetch });
-		expect(req).toBeInstanceOf(Promise);
-		const res = await req;
-		expect(res).toBeInstanceOf(Object);
-		expect(res.status).toEqual(200);
-		expect(res.data).toEqual({ hello: 'world' });
+	describe('options.fetch', () => {
+		it('should accept a custom fetch implementation', async () => {
+			const req = axios.get(jsonExample, { fetch });
+			expect(req).toBeInstanceOf(Promise);
+			const res = await req;
+			expect(res).toBeInstanceOf(Object);
+			expect(res.status).toEqual(200);
+			expect(res.data).toEqual({ hello: 'world' });
+		});
 	});
 
 	it('pre-request interceptor', async () => {
@@ -321,6 +366,24 @@ describe('redaxios', () => {
 			const paramsSerializer = (params) => 'e=iamthelaw';
 			axios.get('/foo', { params, paramsSerializer });
 			expect(fetchMock).toHaveBeenCalledWith('/foo?e=iamthelaw', jasmine.any(Object));
+		});
+	});
+
+	describe('static helpers', () => {
+		it(`#all should work`, async () => {
+			const result = await axios.all([Promise.resolve('hello'), Promise.resolve('world')]);
+
+			expect(result).toEqual(['hello', 'world']);
+		});
+
+		it(`#spread should work`, async () => {
+			const result = await axios.all([Promise.resolve('hello'), Promise.resolve('world')]).then(
+				axios.spread((item1, item2) => {
+					return `${item1} ${item2}`;
+				})
+			);
+
+			expect(result).toEqual('hello world');
 		});
 	});
 });
